@@ -1,0 +1,51 @@
+(ns isa-chip-sim.assembler-test
+  (:require [clojure.test :refer :all]
+            [isa-chip-sim.assembler :refer :all]
+            [clojure.java.io :as io]
+            [isa-chip-sim.execution-loop :refer [->Instruction]]))
+
+(deftest read-asm-file-test
+  (testing "reading an assembly file and cleaning it up"
+    (let [test-content (str "; This is a comment\n"
+                           "start:  MOV R1, #10   ; Load 10 into R1\n"
+                           "        ADD R1, R2    ; Add R2 to R1\n"
+                           "\n"
+                           "loop:   SUB R1, #1    ; Decrement R1\n"
+                           "        BNE loop      ; Branch if not equal to zero\n"
+                           "\n"
+                           "end:    HALT\n")
+          expected-lines ["start:  MOV R1, #10"
+                          "ADD R1, R2"
+                          "loop:   SUB R1, #1"
+                          "BNE loop"
+                          "end:    HALT"]
+          temp-file (java.io.File/createTempFile "test_program" ".asm")
+          file-path (.getAbsolutePath temp-file)]
+      (spit temp-file test-content)
+      (is (= expected-lines (read-asm-file file-path)))
+      (.delete temp-file))))
+
+(deftest first-pass-test
+  (testing "first pass generates correct symbol table"
+    (let [asm-lines ["start:  MOV R1, #10"
+                     "ADD R1, R2"
+                     "loop:   SUB R1, #1"
+                     "BNE loop"
+                     "end:    HALT"]
+          expected-symbol-table {:start 0 :loop 2 :end 4}]
+      (is (= expected-symbol-table (first-pass asm-lines)))))
+
+(deftest second-pass-test
+  (testing "second pass generates correct IR instructions"
+    (let [asm-lines ["start:  MOV R1, #10"
+                     "ADD R1, R2"
+                     "loop:   SUB R1, #1"
+                     "BNE loop"
+                     "end:    HALT"]
+          symbol-table {:start 0 :loop 2 :end 4}
+          expected-ir-instructions [(->Instruction :MOV [:R1 10] {:write-reg :R1})
+                                    (->Instruction :ADD [:R1 :R2] {:write-reg :R1})
+                                    (->Instruction :SUB [:R1 1] {:write-reg :R1})
+                                    (->Instruction :BNE [2] {})
+                                    (->Instruction :HALT [] {})]]
+      (is (= expected-ir-instructions (second-pass asm-lines symbol-table))))))
