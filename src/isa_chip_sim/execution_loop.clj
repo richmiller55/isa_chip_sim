@@ -12,9 +12,9 @@
     (if instruction
       (let [{:keys [result write-reg]} instruction
             unit-keyword (:executed-unit instruction)]
-        (-> state
-            (update :registers #(reg/write-reg % write-reg result))
-            (update :scoreboard #(scoreboard/clear-unit % unit-keyword))))
+        (cond-> (-> state
+                    (update :scoreboard #(scoreboard/clear-unit % unit-keyword)))
+          write-reg (update :registers #(reg/write-reg % write-reg result))))
       state)))
 
 (defn- memory-access [state]
@@ -23,17 +23,17 @@
       (case (:opcode instruction)
         :load
         (let [address (first (:operands instruction))
-              value (mem/read-mem (:memory state) address 4) ; Assuming 4-byte reads
+              value (first (mem/read-mem (:memory state) address 4)) ; Extract the first element
               new-instruction (assoc instruction :result value)]
           (assoc state :mem-wb-latch new-instruction))
 
         :store
         (let [address (second (:operands instruction))
               value (first (:operands instruction))
-              new-memory (mem/write-mem (:memory state) address [value] 4)] ; Assuming 4-byte writes
+              new-memory (mem/write-mem (:memory state) address [value] 4)]
           (-> state
               (assoc :memory new-memory)
-              (assoc :mem-wb-latch nil)))
+              (assoc :mem-wb-latch instruction)))
 
         (assoc state :mem-wb-latch instruction))
       (assoc state :mem-wb-latch nil))))
@@ -58,12 +58,20 @@
         (assoc state :ex-mem-latch nil)
         (let [unit-keyword (scoreboard/find-unit-for-instruction instruction fu/functional-units)
               unit (get fu/functional-units unit-keyword)
-              [src1 src2] (:operands instruction)
-              val1 (if (keyword? src1) (forward-value src1 state) src1)
-              val2 (if (keyword? src2) (forward-value src2 state) src2)
-              result (fu/execute unit instruction [val1 val2])
+              operands (:operands instruction)
+              operand-values (mapv #(if (keyword? %) (forward-value % state) %) operands)
+              result (fu/execute unit instruction operand-values)
               write-reg (get-in instruction [:metadata :write-reg])]
-          (assoc state :ex-mem-latch (assoc result :write-reg write-reg :executed-unit unit-keyword))))
+          (if (= unit-keyword :branch)
+            (if (:branch-taken? result)
+              (-> state
+                  (assoc :if-id-latch nil)
+                  (assoc :id-ex-latch nil)
+                  (update :registers #(reg/write-reg % :pc (:target-address result)))
+                  (assoc :ex-mem-latch nil)
+                  (assoc :branch-just-taken true))
+              (assoc state :ex-mem-latch nil)) ; Branch not taken, treat as NOP
+            (assoc state :ex-mem-latch (assoc result :write-reg write-reg :executed-unit unit-keyword)))))
       (assoc state :ex-mem-latch nil))))
 
 (defn- decode [state]
@@ -75,20 +83,26 @@
           (-> state
               (assoc :id-ex-latch instruction)
               (assoc :scoreboard new-scoreboard))
-          (assoc state :pipeline-stall true :id-ex-latch nil)))
+          (assoc state :pipeline-stall true)))
       (assoc state :id-ex-latch nil))))
 
 (defn- fetch [state]
   (if-not (:pipeline-stall state)
     (let [pc (reg/read-reg (:registers state) :pc)
           instruction (get (:program state) pc)]
-      (-> state
-          (assoc :if-id-latch instruction)
-          (update-in [:registers :registers :pc] (fn [p] (if p (inc p) 1)))))
-    (assoc state :if-id-latch nil)))
+      (if instruction
+        (if (:branch-just-taken state)
+          (assoc state :if-id-latch instruction)
+          (-> state
+              (assoc :if-id-latch instruction)
+              (update-in [:registers :registers :pc] (fn [p] (if p (inc p) 1)))))
+        (assoc state :if-id-latch nil)))
+    state))
 
 (defn run-cycle [current-state]
-  (let [state-no-stall (assoc current-state :pipeline-stall false)
+  (let [state-no-stall (-> current-state
+                           (assoc :pipeline-stall false)
+                           (assoc :branch-just-taken false))
         wb-state (write-back state-no-stall)
         mem-state (memory-access wb-state)
         ex-state (execute mem-state)

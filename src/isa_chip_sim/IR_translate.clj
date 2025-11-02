@@ -44,6 +44,15 @@
 (defn ir-store [src-reg address]
   (->IRInstruction :store [src-reg address] {}))
 
+(defn ir-jmp [address]
+  (->IRInstruction :jmp [address] {}))
+
+(defn ir-beq [src1-reg src2-reg address]
+  (->IRInstruction :beq [src1-reg src2-reg address] {}))
+
+(defn ir-bne [src1-reg src2-reg address]
+  (->IRInstruction :bne [src1-reg src2-reg address] {}))
+
 (defn arm->ir [arm-instruction]
   ;; logic to translate ARM to IR
   )

@@ -40,10 +40,36 @@
 (deftest memory-access-test
   (testing "load and store instructions"
     (let [program [(->Instruction :store [:r1 100] {})
-                   (->Instruction :load [:r2 100] {:write-reg :r2})]
+                   (->Instruction :load [100] {:write-reg :r2})]
           initial-state (-> (new-state :arm)
                             (assoc :program program)
                             (update :registers #(reg/write-reg % :r1 123)))
           final-state (simulate initial-state 8)]
       (is (= [123] (isa-chip-sim.memory/read-mem (:memory final-state) 100 1)))
       (is (= 123 (reg/read-reg (:registers final-state) :r2))))))
+
+(deftest branching-logic-test
+  (testing "beq instruction - branch taken"
+    (let [program [(->Instruction :beq [:r1 :r2 10] {})]
+          initial-state (-> (new-state :arm)
+                            (assoc :program program)
+                            (update :registers #(reg/write-reg % :r1 10))
+                            (update :registers #(reg/write-reg % :r2 10)))
+          final-state (simulate initial-state 3)]
+      (is (= 10 (reg/read-reg (:registers final-state) :pc)))))
+
+  (testing "beq instruction - branch not taken"
+    (let [program [(->Instruction :beq [:r1 :r2 10] {})]
+          initial-state (-> (new-state :arm)
+                            (assoc :program program)
+                            (update :registers #(reg/write-reg % :r1 10))
+                            (update :registers #(reg/write-reg % :r2 20)))
+          final-state (simulate initial-state 3)]
+      (is (= 1 (reg/read-reg (:registers final-state) :pc)))))
+
+  (testing "jmp instruction"
+    (let [program [(->Instruction :jmp [20] {})]
+          initial-state (-> (new-state :arm)
+                            (assoc :program program))
+          final-state (simulate initial-state 3)]
+      (is (= 20 (reg/read-reg (:registers final-state) :pc))))))

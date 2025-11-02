@@ -55,8 +55,23 @@
   (execute [this instruction operand-values]
     (assoc instruction :operands operand-values)))
 
+(defrecord BranchUnit []
+  FunctionalUnit
+  (can-execute? [this instruction]
+    (let [op (:opcode instruction)]
+      (contains? #{:jmp :beq :bne} op)))
+  (execute [this instruction operand-values]
+    (let [{:keys [opcode]} instruction
+          [val1 val2 address] operand-values]
+      (case opcode
+        :jmp {:branch-taken? true :target-address val1}
+        :beq {:branch-taken? (= val1 val2) :target-address address}
+        :bne {:branch-taken? (not= val1 val2) :target-address address}
+        (throw (ex-info "Unknown Branch opcode" {:opcode opcode}))))))
+
 (def functional-units
   {:alu (->ALU)
    :fpu (->FPU)
    :vpu (->VPU)
-   :memory (->MemoryUnit)})
+   :memory (->MemoryUnit)
+   :branch (->BranchUnit)})
