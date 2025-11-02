@@ -30,85 +30,64 @@ To run the compiled JAR:
 java -jar target/uberjar/isa_chip_sim-0.1.0-SNAPSHOT-standalone.jar
 ```
 
-###	design section
-###	Registers
-Registers can be stored in a simple, immutable hash map within the global state,
-with keys representing register names (e.g., :rax, :sp, :r0) and values as their current data.
+**design section
+*	 using openjfx for our UI
+*	 the ui will be multi-screen
+*	 the pipeline display will be the centerpiece 
+*	 functional units activity will be displayed
+*	 the text_segment will contain ISA and orginal ARM or intel based on user keybinding
+*
+***Declarative UI:
+cljfx allows you to define your UI using Clojure data structures, which are then
+diffed and applied to the JavaFX scene graph. This declarative approach simplifies managing
+complex UI states for the simulator.
+***State Management:
+Leverage Clojure's immutable data structures and atoms for managing the simulator's
+state (register values, memory, pipeline stages). cljfx integrates well with these,
+automatically re-rendering parts of the UI when relevant data changes.
+***Hot-Reloading:
+Clojure's excellent REPL-driven development and cljfx's design often allow for hot-reloading
+UI components, significantly speeding up development iterations.
+JavaFX's strengths in custom graphics and data visualization are highly beneficial for an ISA chip simulator:
 
-###  Complex Pipeline with Functional Units
-The pipeline, a sequence of stages, each represented by a function that
-takes the current state (or relevant parts of it) and an instruction, and returns
-the modified state for the next stage or cycle. Pipelining can be managed by
-tracking instructions as they flow through the stages over clock cycles. 
+***Custom Controls:
+Create custom controls to visually represent pipeline stages, registers, and memory blocks
+with specific styling and interaction.
+***Animations:
+Animate instructions moving through pipeline stages or highlight changes in register values.
+***Charts and Graphs:
+Integrate existing JavaFX charting libraries or custom drawing to display performance
+statistics (IPC, CPI) and memory access patterns.
+***Theming:
+JavaFX supports CSS for styling, allowing you to create a visually appealing and consistent theme for your simulator.
+ * Multi-screen Layout: A multi-screen or multi-pane approach is ideal. Consider a main window with the
+     pipeline visualization as the focus. You could then have dockable or separate windows for registers,
+     memory, and the code view (showing both the original ISA and the translated IR). This would allow users to
+     customize their workspace.
 
-###	Pipeline stages:
-Fetch, Decode, Execute (ALU/FPU/VPU),
-Memory Access, Write Back.
+   * Interactive Pipeline: Making the pipeline display the centerpiece is the right call. To make it even more
+     effective, consider adding interactivity. For example, hovering over an instruction in a pipeline stage
+     could display a tooltip with its current state. Clicking on it could freeze the simulation and highlight
+     the corresponding functional units, registers, and memory locations being accessed.
 
-###    Functional Units:
+   * Dynamic Visualizations: Animations will be key to making the simulator feel alive. You could use
+     color-coding to indicate pipeline stalls, data hazards, and control hazards. For functional units, you
+     could visually show which instruction is currently being executed by each unit.
 
-These (ALU, FPU, VPU) would be pure functions that
-perform the required operations based on the instruction
-and data provided by the execution stage.
+   * Data-Rich Code View: The ability to switch between the source ISA and the internal IR is a fantastic
+     feature for debugging and understanding the translation process. Adding syntax highlighting for both would
+     be a great touch. You could also highlight the current instruction being fetched in the code view.
 
-### 	 Modeling Latches and Hazards:
-Latches: Each pipeline stage acts as a latch, holding the instruction and its associated data for one cycle.
-This is naturally modeled by the instruction's presence in a stage within the state map for a specific cycle.
-Data Hazards (RAW, WAR, WAW): These would be detected in the Decode and Execute stages by analyzing
-dependencies between instructions currently in the pipeline.
-WAR Situations: Can be managed by ensuring writes only occur at the Write Back stage in program order,
-or through more complex techniques like register renaming. The functional, immutable approach
-simplifies this as changes are "staged" until the next global state update.
+   * Performance Dashboards: The idea of using charts is excellent. You could create a "performance dashboard"
+     that visualizes key metrics in real-time, such as:
+       * Instructions Per Cycle (IPC)
+       * Cache hit/miss rates
+       * Branch prediction accuracy
+       * Resource utilization of functional units
 
-###	Stalling/Forwarding:
-Hazard detection logic would insert NOPs (stalling) or implement data forwarding (bypassing) by
-reading data from a later pipeline stage instead of the register file.
-###	Translation Layer (ARM and Intel x86)
-A key part of the design is an abstraction layer that translates the disparate ARM and x86 instructions
-into a single, common, internal Intermediate Representation (IR). This IR would be what the simulator's
-pipeline actually processes. 
-
-### end of design section
-
-### Gemini's Comments and Ideas
-
-The design section provides a solid foundation for the simulator. Here are some ideas and comments on the design, along with suggestions for the next steps:
-
-**1. Enhancing the Pipeline Model:**
-
-The current pipeline model is a good start, but it can be made more realistic by introducing explicit pipeline registers between stages. This would involve adding the following to the state:
-
-*   `:if-id-latch`: Holds the instruction fetched from memory.
-*   `:id-ex-latch`: Holds the decoded instruction and its operands.
-*   `:ex-mem-latch`: Holds the result of the ALU/FPU operation and data for memory access.
-*   `:mem-wb-latch`: Holds the data to be written back to the register file.
-
-Each `run-cycle` would then involve moving the instruction from one latch to the next, with each stage operating on the instruction in its input latch.
-
-**2. Advanced Hazard Management (Data Forwarding):**
-
-The current scoreboard implements stalling on hazards. To improve performance, we can implement data forwarding (bypassing). This would involve:
-
-*   In the `Execute` stage, before reading from the register file, check if the source register is the destination of an instruction in the `:ex-mem-latch` or `:mem-wb-latch`.
-*   If so, forward the result from the later stage directly to the ALU/FPU, bypassing the register file and avoiding a stall.
-
-**3. Implementing Memory Access:**
-
-The `Memory Access` stage is currently missing. To implement this, we would need to:
-
-*   Define `load` and `store` instructions in `IR_translate.clj`.
-*   Create a `MemoryUnit` functional unit in `functional_units.clj` that can handle these instructions.
-*   Add a `Memory Access` stage to the `run-cycle` that calls the `MemoryUnit` to perform reads from or writes to memory.
-
-**4. Adding Branching Logic:**
-
-To handle control flow, we need to implement branch instructions. This would involve:
-
-*   Defining branch instructions (e.g., `beq`, `bne`, `jmp`) in `IR_translate.clj`.
-*   Creating a `BranchUnit` functional unit.
-*   In the `Execute` stage, if a branch instruction is taken, the `BranchUnit` would calculate the new program counter (`:pc`) and update it in the state. This would also require flushing the pipeline to discard the incorrectly fetched instructions.
-
-By implementing these features, the simulator will become a more accurate and powerful tool for ISA exploration.
+   * Simulation Control: A crucial part of the UI will be the simulation controls. Standard controls like run,
+     pause, step-by-step (forward and backward, if possible), and reset are essential for debugging and
+     educational purposes.
 
 ### Running Tests
 
