@@ -15,8 +15,8 @@
   (testing "new-register-file for x86"
     (let [rf (new-register-file :x86)]
       (is (instance? isa_chip_sim.register.RegisterFile rf))
-      (is (= (:arch rf) x86-arch))
-      (is (= (count (:registers rf)) (count (:registers x86-arch))))
+      (is (= (:arch rf) x86-32-arch))
+      (is (= (count (:registers rf)) (count (:registers x86-32-arch))))
       (is (every? zero? (vals (:registers rf))))))
 
   (testing "read-reg and write-reg for ARM"
@@ -57,7 +57,8 @@
   (testing "read-mem and write-mem in stack segment"
     (let [mem (new-memory)
           ; Stack grows downwards, so address 0x4000 is the top of the stack
-          ; Writing [10 11 12] at 0x3ffc (stack-base - 4) should put it at the end of the stack vector
+          ; Writing [10 11 12] at 0x3ffc (stack-base - 4)
+	  ; should put it at the end of the stack vector
           updated-mem (write-mem mem (- stack-base 3) [10 11 12] 3)]
       (is (= [10 11 12] (read-mem updated-mem (- stack-base 3) 3)))))
 

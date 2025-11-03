@@ -36,8 +36,96 @@ java -jar target/uberjar/isa_chip_sim-0.1.0-SNAPSHOT-standalone.jar
 *	 the pipeline display will be the centerpiece 
 *	 functional units activity will be displayed
 *	 the text_segment will contain ISA and orginal ARM or intel based on user keybinding
-*
-***Declarative UI:
+###This Clojure code implements a classic five-stage pipelined CPU simulator
+*	(Fetch, Decode, Execute, Memory, Write-back).
+*	It models data hazards, control hazards (branch prediction/handling),
+*	and resource management using a scoreboard.
+
+###1. Overall Structure and Design
+*     **The code uses Clojure's strengths:**
+*      immutability, maps, and functional updates (assoc, update, cond->, case).
+*     **State Management:** The entire simulation state is held within a single,
+large, immutable map. The run-cycle function takes the current state map
+and returns a new state map representing the result of one clock cycle.
+This makes the simulation predictable and easier to debug.
+*    **Pipelining:** The run-cycle function orchestrates the stages
+in reverse order (WB -> Mem -> Ex -> ID -> IF) to avoid using
+the "same" clock cycle's modified data in an earlier stage.
+
+*   **Modularity:** It requires several other namespaces
+(scoreboard, functional-units, register, memory),
+suggesting a well-structured project.
+###2. Key Components and Their Roles
+###Data Structures
+*	**Instruction record:** A simple representation of an instruction
+with an opcode, operands, and metadata
+(likely where the destination register is stored).
+*	**Global State Map:**
+* This map implicitly holds everything:
+* :registers: Current CPU registers (using the isa-chip-sim.register API).
+* :memory: The main memory (using the isa-chip-sim.memory API).
+* :program: A map of PC address to Instruction object.
+* :scoreboard: Resource management/hazard tracking.
+* :if-id-latch, :id-ex-latch, :ex-mem-latch, :mem-wb-latch:
+* The actual "pipes" holding instructions between stages.
+* :pipeline-stall, :branch-just-taken, :clock: Control flags and metrics.
+* **Pipelined Stages (Functions):**
+* The core logic is in the defn- (private functions) for each stage:
+* write-back (WB):
+* Reads from :mem-wb-latch.
+* Action: Writes the final :result to the destination register (:registers).
+* Resource Management: Clears the corresponding functional unit in the :scoreboard.
+* **memory-access (Mem):**
+* Reads from :ex-mem-latch.
+* Action: Handles :load and :store operations using the mem namespace API.
+Stores update :memory, loads fetch data and append it to the
+instruction's :result field for the WB stage.
+execute (Ex):
+Reads from :id-ex-latch.
+*     **Data Forwarding/Hazard Avoidance:** This is a critical piece (forward-value).
+It checks the next latches (Ex/Mem and Mem/WB) for a result before reading from
+the actual register file, implementing classic CPU forwarding logic.
+*   **Functional Units:** Uses the fu namespace to calculate the result
+based on the instruction type.
+*     **Control Hazard Handling (Branches):** This logic is complex.
+If a branch is taken, it flushes the subsequent pipeline stages
+(:if-id-latch, :id-ex-latch) and updates the PC register immediately.
+It sets a flag :branch-just-taken to manage fetching the correct next
+instruction in the subsequent fetch stage.
+*	    **decode (ID):**
+Reads from :if-id-latch.
+*     **Data Hazard/Structural Hazard Check:** This is where the
+scoreboard/issue-instruction check happens.
+*     **Stalling:** If the scoreboard says the
+instruction cannot issue (due to a structural hazard or waiting for
+a data dependency), it sets :pipeline-stall true.
+###fetch (IF)
+*	 **Stall Handling:** Only runs if :pipeline-stall is false.
+Action: Reads the instruction at the current :pc from the :program map.
+PC Update: Increments the PC for the next fetch.
+
+*  **Branch Handling:** Uses the :branch-just-taken flag to decide if it
+should behave normally or if it needs to resume fetching after a jump.
+###3. Areas for Improvement/Potential Issues
+*     **forward-value Implementation:** While it handles forwarding from the
+next two stages, a real out-of-order execution engine would need a much more
+robust mechanism (e.g., a Reorder Buffer or Reservation Stations) to track
+where every pending result is coming from. This is a simple in-order
+forwarding mechanism.
+*    **Branch Prediction:** The current system uses a very simple form of
+branch resolution in the execute stage. This results in a 3-cycle penalty
+(IF, ID, EX cycles wasted) whenever a branch is
+taken. A real CPU would use a Branch Target Buffer
+(BTB) for speculative execution.
+*     **Memory Abstraction:** The mem/read-mem returns a collection/sequence
+((mem/read-mem ...)), and the code immediately takes the
+first element ((first (mem/read-mem ...))). This works for single values
+but might be limiting for multi-word access instructions.
+Instruction Representation: The Instruction record is simple,
+but the dependence on metadata for things like write-reg means
+the functions rely heavily on implicit knowledge of how instructions
+are constructed.*
+###Declarative UI:
 cljfx allows you to define your UI using Clojure data structures, which are then
 diffed and applied to the JavaFX scene graph. This declarative approach simplifies managing
 complex UI states for the simulator.
