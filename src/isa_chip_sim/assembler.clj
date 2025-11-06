@@ -110,3 +110,11 @@
                                          {})
                      :HALT (->Instruction opcode [] {})
                      nil))))))))
+
+
+(defn assemble-file [file-path]
+  (let [asm-lines    (asm/read-asm-file file-path)
+        symbol-table (asm/first-pass asm-lines)
+        instructions (asm/second-pass asm-lines symbol-table)]
+    ;; Return the final sequence of instructions
+    instructions))
