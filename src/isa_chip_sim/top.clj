@@ -14,6 +14,7 @@
    :id-ex-latch nil
    :ex-mem-latch nil
    :mem-wb-latch nil
+   :btb         {}
    :program     []
    :clock       0
    :status      :running})

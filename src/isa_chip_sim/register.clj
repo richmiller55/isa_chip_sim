@@ -2,7 +2,9 @@
 
 (def arm-arch
   {:registers [:r0 :r1 :r2 :r3 :r4 :r5 :r6 :r7 :r8 :r9 :r10 :r11 :r12 :sp :lr :pc
-               :f0 :f1 :f2 :f3 :f4 :f5 :f6 :f7]
+               :f0 :f1 :f2 :f3 :f4 :f5 :f6 :f7
+               :v0 :v1 :v2 :v3 :v4 :v5 :v6 :v7 :v8 :v9 :v10 :v11 :v12 :v13 :v14 :v15
+               :v16 :v17 :v18 :v19 :v20 :v21 :v22 :v23 :v24 :v25 :v26 :v27 :v28 :v29 :v30 :v31]
    :pointer-size 32})
 
 (def x86-32-arch
@@ -31,7 +33,21 @@
     (->RegisterFile arch (zipmap (:registers arch) (repeat 0)))))
 
 (defn read-reg [^RegisterFile register-file reg-name]
-  (get-in register-file [:registers reg-name]))
+  (let [reg-str (name reg-name)]
+    (if (.startsWith reg-str "xmm")
+      (let [ymm-name (keyword (str "ymm" (subs reg-str 3)))
+            ymm-val (get-in register-file [:registers ymm-name])]
+        (if (vector? ymm-val)
+          (subvec ymm-val 0 4)
+          (subvec (vec (repeat 8 0)) 0 4)))
+      (get-in register-file [:registers reg-name]))))
 
 (defn write-reg [^RegisterFile register-file reg-name value]
-  (assoc-in register-file [:registers reg-name] value))
+  (let [reg-str (name reg-name)]
+    (if (.startsWith reg-str "xmm")
+      (let [ymm-name (keyword (str "ymm" (subs reg-str 3)))
+            ymm-val (get-in register-file [:registers ymm-name])
+            ymm-vec (if (vector? ymm-val) ymm-val (vec (repeat 8 0)))
+            new-ymm-val (into value (subvec ymm-vec 4 8))]
+        (assoc-in register-file [:registers ymm-name] new-ymm-val))
+      (assoc-in register-file [:registers reg-name] value))))

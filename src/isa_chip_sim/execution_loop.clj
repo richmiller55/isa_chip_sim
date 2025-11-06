@@ -61,16 +61,36 @@
               operands (:operands instruction)
               operand-values (mapv #(if (keyword? %) (forward-value % state) %) operands)
               result (fu/execute unit instruction operand-values)
-              write-reg (get-in instruction [:metadata :write-reg])]
+              write-reg (get-in instruction [:metadata :write-reg])
+              original-pc (get-in instruction [:metadata :original-pc])
+              current-pc (reg/read-reg (:registers state) :pc)]
           (if (= unit-keyword :branch)
-            (if (:branch-taken? result)
-              (-> state
-                  (assoc :if-id-latch nil)
-                  (assoc :id-ex-latch nil)
-                  (update :registers #(reg/write-reg % :pc (:target-address result)))
-                  (assoc :ex-mem-latch nil)
-                  (assoc :branch-just-taken true))
-              (assoc state :ex-mem-latch nil)) ; Branch not taken, treat as NOP
+            (let [branch-taken? (:branch-taken? result)
+                  target-address (:target-address result)
+                  actual-next-pc (if branch-taken? target-address (inc original-pc))
+                  predicted-pc-from-btb (get (:btb state) original-pc)
+                  misprediction? (and (:btb-prediction-taken state)
+                                      (not= actual-next-pc predicted-pc-from-btb))]
+              (cond
+                misprediction?
+                (-> state
+                    (assoc :if-id-latch nil)
+                    (assoc :id-ex-latch nil)
+                    (update :registers #(reg/write-reg % :pc actual-next-pc))
+                    (assoc :ex-mem-latch nil)
+                    (assoc :btb-prediction-taken false))
+
+                branch-taken?
+                (-> state
+                    (assoc :if-id-latch nil)
+                    (assoc :id-ex-latch nil)
+                    (update :registers #(reg/write-reg % :pc target-address))
+                    (assoc :ex-mem-latch nil)
+                    (assoc :branch-just-taken true)
+                    (update :btb assoc original-pc target-address))
+
+                :else
+                (assoc state :ex-mem-latch nil)))
             (assoc state :ex-mem-latch (assoc result :write-reg write-reg :executed-unit unit-keyword)))))
       (assoc state :ex-mem-latch nil))))
 
@@ -89,13 +109,16 @@
 (defn- fetch [state]
   (if-not (:pipeline-stall state)
     (let [pc (reg/read-reg (:registers state) :pc)
-          instruction (get (:program state) pc)]
+          btb-entry (get (:btb state) pc)
+          predicted-pc (if btb-entry btb-entry pc)
+          instruction (get (:program state) predicted-pc)]
       (if instruction
         (if (:branch-just-taken state)
-          (assoc state :if-id-latch instruction)
+          (assoc state :if-id-latch (assoc instruction :metadata (assoc (:metadata instruction) :original-pc pc)))
           (-> state
-              (assoc :if-id-latch instruction)
-              (update-in [:registers :registers :pc] (fn [p] (if p (inc p) 1)))))
+              (assoc :if-id-latch (assoc instruction :metadata (assoc (:metadata instruction) :original-pc pc)))
+              (update-in [:registers :registers :pc] (fn [p] (if p (inc p) 1)))
+              (assoc :btb-prediction-taken (boolean btb-entry))))
         (assoc state :if-id-latch nil)))
     state))
 

@@ -42,10 +42,16 @@
   FunctionalUnit
   (can-execute? [this instruction]
     (let [op (:opcode instruction)]
-      (contains? #{:vadd :vsub :vmul} op)))
+      (contains? #{:vadd :vsub :vmul :vdiv :vload :vstore} op)))
   (execute [this instruction operand-values]
-    ;; Dummy implementation
-    {:result [1 2 3 4] :write-reg :v0}))
+    (let [{:keys [opcode metadata]} instruction
+          [val1 val2] operand-values]
+      (case opcode
+        :vadd {:result (mapv + val1 val2)}
+        :vsub {:result (mapv - val1 val2)}
+        :vmul {:result (mapv * val1 val2)}
+        :vdiv {:result (mapv quot val1 val2)}
+        (throw (ex-info "Unknown VPU opcode" {:opcode opcode}))))))
 
 (defrecord MemoryUnit []
   FunctionalUnit
