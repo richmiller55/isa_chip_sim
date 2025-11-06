@@ -1,27 +1,28 @@
 (ns isa-chip-sim.core
-  (:require [cljfx.api :as fx])
+  (:require [isa-chip-sim.ui-ascii :as ui]
+            [isa-chip-sim.top :as top]
+            [isa-chip-sim.register :as reg]
+            [isa-chip-sim.execution-loop :as el]
+            [isa-chip-sim.execution-loop :refer [->Instruction]])
   (:gen-class))
 
-;; Define a simple UI component
-(defn root-view [{:keys [text]}]
-  {:fx/type :stage
-   :showing true
-   :title "cljfx Minimal Example"
-   :width 400
-   :height 200
-   :scene {:fx/type :scene
-           :root {:fx/type :v-box
-                  :alignment :center
-                  :children [{:fx/type :label
-                              :text text}]}}
-   :on-close-request (fn [_] (System/exit 0))}) ;; Added for graceful exit
+(defn clear-screen []
+  (print (str (char 27) "[2J"))
+  (print (str (char 27) "[;H")))
 
-;; Initial state
-(def *state
-  (atom {:text "Hello, cljfx!"}))
+(def program
+  [(->Instruction :add [:r1 :r2] {:write-reg :r3})
+   (->Instruction :add [:r3 :r4] {:write-reg :r5})])
 
-;; Mount the UI
-(defn -main [& args]
-  (fx/create-renderer
-    :opts {:fx.opt/map-event-handler (fn [event] (println "Event:" event))}) ;; Added event handler
-  (fx/mount-renderer *state root-view))
+(defn -main
+  "The entry-point for the application."
+  [& args]
+  (loop [state (-> (top/new-state :arm)
+                   (assoc :program program)
+                   (update :registers #(reg/write-reg % :r1 10))
+                   (update :registers #(reg/write-reg % :r2 20))
+                   (update :registers #(reg/write-reg % :r4 5)))]
+    (clear-screen)
+    (println (ui/render-ui state))
+    (Thread/sleep 500)
+    (recur (el/run-cycle state))))

@@ -31,7 +31,6 @@ java -jar target/uberjar/isa_chip_sim-0.1.0-SNAPSHOT-standalone.jar
 ```
 
 **design section
-*	 using openjfx for our UI
 *	 the ui will be multi-screen
 *	 the pipeline display will be the centerpiece 
 *	 functional units activity will be displayed
@@ -125,29 +124,16 @@ Instruction Representation: The Instruction record is simple,
 but the dependence on metadata for things like write-reg means
 the functions rely heavily on implicit knowledge of how instructions
 are constructed.*
-###Declarative UI:
-cljfx allows you to define your UI using Clojure data structures, which are then
-diffed and applied to the JavaFX scene graph. This declarative approach simplifies managing
-complex UI states for the simulator.
 ***State Management:
 Leverage Clojure's immutable data structures and atoms for managing the simulator's
 state (register values, memory, pipeline stages). cljfx integrates well with these,
 automatically re-rendering parts of the UI when relevant data changes.
-***Hot-Reloading:
-Clojure's excellent REPL-driven development and cljfx's design often allow for hot-reloading
-UI components, significantly speeding up development iterations.
-JavaFX's strengths in custom graphics and data visualization are highly beneficial for an ISA chip simulator:
 
 ***Custom Controls:
 Create custom controls to visually represent pipeline stages, registers, and memory blocks
 with specific styling and interaction.
 ***Animations:
 Animate instructions moving through pipeline stages or highlight changes in register values.
-***Charts and Graphs:
-Integrate existing JavaFX charting libraries or custom drawing to display performance
-statistics (IPC, CPI) and memory access patterns.
-***Theming:
-JavaFX supports CSS for styling, allowing you to create a visually appealing and consistent theme for your simulator.
  * Multi-screen Layout: A multi-screen or multi-pane approach is ideal. Consider a main window with the
      pipeline visualization as the focus. You could then have dockable or separate windows for registers,
      memory, and the code view (showing both the original ISA and the translated IR). This would allow users to
