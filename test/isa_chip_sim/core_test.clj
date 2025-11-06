@@ -12,11 +12,18 @@
       (is (= (count (:registers rf)) (count (:registers arm-arch))))
       (is (every? zero? (vals (:registers rf))))))
 
-  (testing "new-register-file for x86"
-    (let [rf (new-register-file :x86)]
+  (testing "new-register-file for x86-32"
+    (let [rf (new-register-file :x86-32)]
       (is (instance? isa_chip_sim.register.RegisterFile rf))
       (is (= (:arch rf) x86-32-arch))
       (is (= (count (:registers rf)) (count (:registers x86-32-arch))))
+      (is (every? zero? (vals (:registers rf))))))
+
+  (testing "new-register-file for x86-64"
+    (let [rf (new-register-file :x86-64)]
+      (is (instance? isa_chip_sim.register.RegisterFile rf))
+      (is (= (:arch rf) x86-64-arch))
+      (is (= (count (:registers rf)) (count (:registers x86-64-arch))))
       (is (every? zero? (vals (:registers rf))))))
 
   (testing "read-reg and write-reg for ARM"
@@ -24,10 +31,15 @@
           updated-rf (write-reg rf :r0 123)]
       (is (= 123 (read-reg updated-rf :r0)))))
 
-  (testing "read-reg and write-reg for x86"
-    (let [rf (new-register-file :x86)
+  (testing "read-reg and write-reg for x86-32"
+    (let [rf (new-register-file :x86-32)
           updated-rf (write-reg rf :eax 456)]
-      (is (= 456 (read-reg updated-rf :eax))))))
+      (is (= 456 (read-reg updated-rf :eax)))))
+
+  (testing "read-reg and write-reg for x86-64"
+    (let [rf (new-register-file :x86-64)
+          updated-rf (write-reg rf :rax 789)]
+      (is (= 789 (read-reg updated-rf :rax))))))
 
 (deftest memory-test
   (testing "new-memory initializes correctly"
