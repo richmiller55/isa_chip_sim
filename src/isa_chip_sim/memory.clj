@@ -21,12 +21,19 @@
   (cond
     (and (>= address text-base) (< address (+ text-base text-size)))
     [:text (- address text-base)]
+
     (and (>= address bss-base) (< address (+ bss-base bss-size)))
     [:bss (- address bss-base)]
+
     (and (>= address heap-base) (< address (+ heap-base heap-size)))
     [:heap (- address heap-base)]
+
+    ;; --- CORRECTED STACK LOGIC ---
+    ;; We check if the address falls within the stack's *total allocated range*.
+    ;; The offset is calculated normally from the lowest stack address.
     (and (>= address (- stack-base stack-size)) (< address stack-base))
-    [:stack (- stack-base address)]
+    [:stack (- address (- stack-base stack-size))]
+    
     :else
     (throw (ex-info "Invalid memory address" {:address address}))))
 

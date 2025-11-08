@@ -4,48 +4,38 @@
 (defrecord IRInstruction [opcode operands metadata])
 
 ;; Helper functions for creating common IR instructions
-(defn ir-add [dest-reg src1-reg src2-reg]
+(defn ir-add ^IRInstruction [dest-reg src1-reg src2-reg]
   (->IRInstruction :add [src1-reg src2-reg dest-reg] {:write-reg dest-reg}))
 
-(defn ir-sub [dest-reg src1-reg src2-reg]
+(defn ir-sub ^IRInstruction [dest-reg src1-reg src2-reg]
   (->IRInstruction :sub [src1-reg src2-reg dest-reg] {:write-reg dest-reg}))
 
-(defn ir-mul [dest-reg src1-reg src2-reg]
+(defn ir-mul ^IRInstruction [dest-reg src1-reg src2-reg]
   (->IRInstruction :mul [src1-reg src2-reg dest-reg] {:write-reg dest-reg}))
 
-(defn ir-div [dest-reg src1-reg src2-reg]
+(defn ir-div ^IRInstruction [dest-reg src1-reg src2-reg]
   (->IRInstruction :div [src1-reg src2-reg dest-reg] {:write-reg dest-reg}))
 
-(defn ir-or [dest-reg src1-reg src2-reg]
+(defn ir-or ^IRInstruction [dest-reg src1-reg src2-reg]
   (->IRInstruction :or [src1-reg src2-reg dest-reg] {:write-reg dest-reg}))
 
-(defn ir-and [dest-reg src1-reg src2-reg]
+(defn ir-and ^IRInstruction [dest-reg src1-reg src2-reg]
   (->IRInstruction :and [src1-reg src2-reg dest-reg] {:write-reg dest-reg}))
 
-(defn ir-xor [dest-reg src1-reg src2-reg]
+(defn ir-xor ^IRInstruction [dest-reg src1-reg src2-reg]
   (->IRInstruction :xor [src1-reg src2-reg dest-reg] {:write-reg dest-reg}))
 
-(defn ir-mov [dest-reg src-reg]
+(defn ir-mov ^IRInstruction [dest-reg src-reg]
   (->IRInstruction :mov [src-reg dest-reg] {:write-reg dest-reg}))
 
-;; New Integer Arithmetic/Logic IR instructions
-(defn ir-mul [dest-reg src1-reg src2-reg]
-  (->IRInstruction :mul [src1-reg src2-reg dest-reg] {:write-reg dest-reg}))
-
-(defn ir-div [dest-reg src1-reg src2-reg]
-  (->IRInstruction :div [src1-reg src2-reg dest-reg] {:write-reg dest-reg}))
-
-(defn ir-udiv [dest-reg src1-reg src2-reg]
+(defn ir-udiv ^IRInstruction [dest-reg src1-reg src2-reg]
   (->IRInstruction :udiv [src1-reg src2-reg dest-reg] {:write-reg dest-reg}))
 
-(defn ir-inc [reg]
+(defn ir-inc ^IRInstruction [reg]
   (->IRInstruction :inc [reg] {:write-reg reg}))
 
-(defn ir-dec [reg]
+(defn ir-dec ^IRInstruction [reg]
   (->IRInstruction :dec [reg] {:write-reg reg}))
-
-(defn ir-xor [dest-reg src1-reg src2-reg]
-  (->IRInstruction :xor [src1-reg src2-reg dest-reg] {:write-reg dest-reg}))
 
 ;; Comparison IR instruction
 (defn ir-cmp [op1 op2]
