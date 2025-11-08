@@ -51,6 +51,8 @@
         :vsub {:result (mapv - val1 val2)}
         :vmul {:result (mapv * val1 val2)}
         :vdiv {:result (mapv quot val1 val2)}
+        :vload (assoc instruction :operands operand-values)
+        :vstore (assoc instruction :operands operand-values)
         (throw (ex-info "Unknown VPU opcode" {:opcode opcode}))))))
 
 (defrecord MemoryUnit []

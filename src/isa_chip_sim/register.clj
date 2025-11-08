@@ -14,6 +14,7 @@
 (def x86-32-arch
   {:registers [:eax :ebx :ecx :edx :esi :edi :esp :ebp :eip :eflags]
    :pointer-size 32
+   :word-size 32
    :gpr-init-val 0})
 
 (def x86-64-arch

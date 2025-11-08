@@ -8,7 +8,7 @@
 (def NOP (->Instruction :nop [] {}))
 
 (defn- write-back [state]
-  (let [instruction (:mem-wb-latch state)]
+  (let [instruction (:data (:mem-wb-latch state))]
     (if instruction
       (let [{:keys [result write-reg]} instruction
             unit-keyword (:executed-unit instruction)]
@@ -18,14 +18,15 @@
       state)))
 
 (defn- memory-access [state]
-  (let [instruction (:ex-mem-latch state)]
+  (let [instruction (:data (:ex-mem-latch state))]
     (if instruction
       (case (:opcode instruction)
         :load
         (let [address (first (:operands instruction))
-              value (first (mem/read-mem (:memory state) address 4)) ; Extract the first element
+              value (first (mem/read-mem (:memory state) address 4))
+                                        ; Extract the first element
               new-instruction (assoc instruction :result value)]
-          (assoc state :mem-wb-latch new-instruction))
+          (assoc-in state [:mem-wb-latch :data] new-instruction))
 
         :store
         (let [address (second (:operands instruction))
@@ -33,78 +34,90 @@
               new-memory (mem/write-mem (:memory state) address [value] 4)]
           (-> state
               (assoc :memory new-memory)
-              (assoc :mem-wb-latch instruction)))
+              (assoc-in [:mem-wb-latch :data] instruction)))
 
-        (assoc state :mem-wb-latch instruction))
-      (assoc state :mem-wb-latch nil))))
+        (assoc-in state [:mem-wb-latch :data] instruction))
+      (assoc-in state [:mem-wb-latch :data] nil))))
 
 (defn- forward-value [reg-name state]
-  (let [ex-mem-latch (:ex-mem-latch state)
-        mem-wb-latch (:mem-wb-latch state)]
+  (let [ex-mem-instruction (:data (:ex-mem-latch state))
+        mem-wb-instruction (:data (:mem-wb-latch state))]
     (cond
-      (= reg-name (:write-reg ex-mem-latch))
-      (:result ex-mem-latch)
+      (= reg-name (:write-reg ex-mem-instruction))
+      (:result ex-mem-instruction)
 
-      (= reg-name (:write-reg mem-wb-latch))
-      (:result mem-wb-latch)
+      (= reg-name (:write-reg mem-wb-instruction))
+      (:result mem-wb-instruction)
 
       :else
       (reg/read-reg (:registers state) reg-name))))
 
+(defn- flush-pipeline-from [state stage-keyword]
+  ;; This is a simplified example; you would implement the logic to clear all stages upstream of a given point
+  (-> state
+      (assoc-in [:if-id-latch :data] nil)
+      (assoc-in [:id-ex-latch :data] nil)
+      ; ... maybe clear more latches depending on where the flush starts ...
+      ))
+
 (defn- execute [state]
-  (let [instruction (:id-ex-latch state)]
+  (let [instruction (:data (:id-ex-latch state))]
     (if instruction
       (if (= (:opcode instruction) :nop)
-        (assoc state :ex-mem-latch nil)
-        (let [unit-keyword (scoreboard/find-unit-for-instruction instruction fu/functional-units)
-              unit (get fu/functional-units unit-keyword)
-              operands (:operands instruction)
-              operand-values (mapv #(if (keyword? %) (forward-value % state) %) operands)
-              result (fu/execute unit instruction operand-values)
-              write-reg (get-in instruction [:metadata :write-reg])
-              original-pc (get-in instruction [:metadata :original-pc])
-              current-pc (reg/read-reg (:registers state) :pc)]
-          (if (= unit-keyword :branch)
-            (let [branch-taken? (:branch-taken? result)
-                  target-address (:target-address result)
-                  actual-next-pc (if branch-taken? target-address (inc original-pc))
-                  predicted-pc-from-btb (get (:btb state) original-pc)
-                  misprediction? (and (:btb-prediction-taken state)
-                                      (not= actual-next-pc predicted-pc-from-btb))]
-              (cond
-                misprediction?
-                (-> state
-                    (assoc :if-id-latch nil)
-                    (assoc :id-ex-latch nil)
-                    (update :registers #(reg/write-reg % :pc actual-next-pc))
-                    (assoc :ex-mem-latch nil)
-                    (assoc :btb-prediction-taken false))
+        (assoc-in state [:ex-mem-latch :data] nil)
+        (let [unit-keyword (scoreboard/find-unit-for-instruction instruction fu/functional-units)] ; Find the keyword
+          (if-not unit-keyword ; <--- Guard added here
+            (throw (ex-info (str "No functional unit found for opcode: " (:opcode instruction))
+                            {:instruction instruction}))
+            (let [unit (get fu/functional-units unit-keyword)
+                  operands (:operands instruction)
+                  operand-values (mapv #(if (keyword? %) (forward-value % state) %) operands)
+                  result (fu/execute unit instruction operand-values)
+                  write-reg (get-in instruction [:metadata :write-reg])
+                  original-pc (get-in instruction [:metadata :original-pc])
+                  current-pc (reg/read-reg (:registers state) :pc)]
+              (if (= unit-keyword :branch)
+                (let [branch-taken? (:branch-taken? result)
+                      target-address (:target-address result)
+                      actual-next-pc (if branch-taken? target-address (inc original-pc))
+                      predicted-pc-from-btb (get (:btb state) original-pc)
+                      misprediction? (and (:btb-prediction-taken state)
+                                          (not= actual-next-pc predicted-pc-from-btb))]
+                  (cond
+                    misprediction?
+                    (-> state
+                        (flush-pipeline-from :if-id-latch) 
+                        (flush-pipeline-from :id-ex-latch) 
+                        (update :registers #(reg/write-reg % :pc actual-next-pc))
+                        (assoc-in [:ex-mem-latch :data] nil)
+                        (assoc :btb-prediction-taken false))
 
-                branch-taken?
-                (-> state
-                    (assoc :if-id-latch nil)
-                    (assoc :id-ex-latch nil)
-                    (update :registers #(reg/write-reg % :pc target-address))
-                    (assoc :ex-mem-latch nil)
-                    (assoc :branch-just-taken true)
-                    (update :btb assoc original-pc target-address))
+                    branch-taken?
+                    (-> state
+                        (assoc-in [:if-id-latch :data] nil)
+                        (assoc-in [:id-ex-latch :data] nil)
+                        (update :registers #(reg/write-reg % :pc target-address))
+                        (assoc-in [:ex-mem-latch :data] nil)
+                        (assoc :branch-just-taken true)
+                        (update :btb assoc original-pc target-address))
 
-                :else
-                (assoc state :ex-mem-latch nil)))
-            (assoc state :ex-mem-latch (assoc result :write-reg write-reg :executed-unit unit-keyword)))))
-      (assoc state :ex-mem-latch nil))))
+                    :else
+                    (assoc-in state [:ex-mem-latch :data] nil)))
+                (assoc-in state [:ex-mem-latch :data] (assoc result :write-reg write-reg :executed-unit unit-keyword)))))))
+      (assoc-in state [:ex-mem-latch :data] nil))))
 
 (defn- decode [state]
-  (let [instruction (:if-id-latch state)]
+  (let [instruction (:data (:if-id-latch state))]
     (if instruction
       (if (= (:opcode instruction) :nop)
-        (assoc state :id-ex-latch instruction)
+        (assoc-in state [:id-ex-latch :data] instruction)
+        (do (prn "Decoding instruction:" instruction) 
         (if-let [new-scoreboard (scoreboard/issue-instruction (:scoreboard state) instruction fu/functional-units)]
           (-> state
-              (assoc :id-ex-latch instruction)
+              (assoc-in [:id-ex-latch :data] instruction)
               (assoc :scoreboard new-scoreboard))
-          (assoc state :pipeline-stall true)))
-      (assoc state :id-ex-latch nil))))
+          (assoc state :pipeline-stall true))))
+      (assoc-in state [:id-ex-latch :data] nil))))
 
 (defn- fetch [state]
   (if-not (:pipeline-stall state)
@@ -114,12 +127,12 @@
           instruction (get (:program state) predicted-pc)]
       (if instruction
         (if (:branch-just-taken state)
-          (assoc state :if-id-latch (assoc instruction :metadata (assoc (:metadata instruction) :original-pc pc)))
+          (assoc-in state [:if-id-latch :data] (assoc instruction :metadata (assoc (:metadata instruction) :original-pc pc)))
           (-> state
-              (assoc :if-id-latch (assoc instruction :metadata (assoc (:metadata instruction) :original-pc pc)))
+              (assoc-in [:if-id-latch :data] (assoc instruction :metadata (assoc (:metadata instruction) :original-pc pc)))
               (update-in [:registers :registers :pc] (fn [p] (if p (inc p) 1)))
               (assoc :btb-prediction-taken (boolean btb-entry))))
-        (assoc state :if-id-latch nil)))
+        (assoc-in state [:if-id-latch :data] nil)))
     state))
 
 (defn run-cycle [current-state]
@@ -136,7 +149,7 @@
 
 (defn simulate [initial-state cycles]
   (loop [state initial-state cycle 0]
-    (if (< cycle cycles)
+    (if (and (< cycle cycles) (not= (:status state) :halted)) ; <--- ADD halt check here
       (let [next-state (run-cycle state)]
         (recur next-state (inc cycle)))
       state)))
