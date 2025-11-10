@@ -9,17 +9,19 @@
    :data   nil})
 
 (defn new-state [arch-keyword]
-  {:registers   (new-register-file arch-keyword)
-   :memory      (new-memory)
-   :scoreboard  (scoreboard/new-scoreboard fu/functional-units)
-   :functional-units fu/functional-units
-   :pipeline    {}
-   :if-id-latch (new-latch)
-   :id-ex-latch (new-latch)
-   :ex-mem-latch (new-latch)
-   :mem-wb-latch (new-latch)
-   :btb         {}
-   :program     []
-   :clock       0
-   :status      :running})
+  (let [arch-def (get isa-chip-sim.register/architectures arch-keyword)]
+    {:registers   (new-register-file arch-keyword)
+     :pc-reg      (:pc-reg arch-def)
+     :memory      (new-memory)
+     :scoreboard  (scoreboard/new-scoreboard fu/functional-units)
+     :functional-units fu/functional-units
+     :pipeline    {}
+     :if-id-latch (new-latch)
+     :id-ex-latch (new-latch)
+     :ex-mem-latch (new-latch)
+     :mem-wb-latch (new-latch)
+     :btb         {}
+     :program     []
+     :clock       0
+     :status      :running}))
 

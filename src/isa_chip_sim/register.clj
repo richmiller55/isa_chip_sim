@@ -7,12 +7,14 @@
                :f0 :f1 :f2 :f3 :f4 :f5 :f6 :f7
                :v0 :v1 :v2 :v3 :v4 :v5 :v6 :v7 :v8 :v9 :v10 :v11 :v12 :v13 :v14 :v15
                :v16 :v17 :v18 :v19 :v20 :v21 :v22 :v23 :v24 :v25 :v26 :v27 :v28 :v29 :v30 :v31]
+   :pc-reg :pc
    :pointer-size 32
    :vector-reg-size 128 ; V registers are 128 bits
    :gpr-init-val 0})
 
 (def x86-32-arch
   {:registers [:eax :ebx :ecx :edx :esi :edi :esp :ebp :eip :eflags]
+   :pc-reg :eip
    :pointer-size 32
    :word-size 32
    :gpr-init-val 0})
@@ -25,6 +27,7 @@
                :xmm8 :xmm9 :xmm10 :xmm11 :xmm12 :xmm13 :xmm14 :xmm15
                :ymm0 :ymm1 :ymm2 :ymm3 :ymm4 :ymm5 :ymm6 :ymm7
                :ymm8 :ymm9 :ymm10 :ymm11 :ymm12 :ymm13 :ymm14 :ymm15]
+   :pc-reg :rip
    :pointer-size 64
    :vector-reg-size 256 ; YMM registers are 256 bits
    :gpr-init-val 0})
