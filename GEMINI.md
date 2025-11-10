@@ -29,6 +29,20 @@ To run the compiled JAR:
 ```sh
 java -jar target/uberjar/isa_chip_sim-0.1.0-SNAPSHOT-standalone.jar
 ```
+### verification of assembly test code for correctness
+
+to build a x86 assembly file
+x86_prime_numbers.asm
+'''sh
+nasm -f elf resources/asm_source/x86_prime_number.asm
+'''
+
+to link assembly object
+
+'''sh
+ld -m elf_i386 -s -o resources/asm_source/x86_prime_number resources/asm_source/x86_prime_number.o
+'''
+
 
 **design section
 *	 the ui will be multi-screen
