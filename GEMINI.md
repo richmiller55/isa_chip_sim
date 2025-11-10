@@ -2,9 +2,11 @@
 
 ## Project Overview
 
-This project is an ISA (Instruction Set Architecture) chip simulator written in Clojure. It is in the early stages of development, but the core components suggest a sophisticated design.
+This project is an ISA (Instruction Set Architecture) chip simulator written in Clojure. 
 
-The simulator models a classic 5-stage RISC pipeline: Fetch, Decode, Execute, Memory, and Write Back. A key feature is its apparent design to support multiple ISAs (e.g., ARM, x86) by translating them into a common Intermediate Representation (IR) before execution.
+The simulator models a classic 5-stage RISC pipeline: Fetch, Decode, Execute, Memory, and Write Back.
+A key feature is its apparent design to support multiple ISAs (e.g., ARM, x86) by translating them
+into a common Intermediate Representation (IR) before execution.
 
 The state of the simulation, including registers, memory, and pipeline status, is managed in a central data structure.
 
@@ -52,8 +54,8 @@ in reverse order (WB -> Mem -> Ex -> ID -> IF) to avoid using
 the "same" clock cycle's modified data in an earlier stage.
 
 *   **Modularity:** It requires several other namespaces
-(scoreboard, functional-units, register, memory),
-suggesting a well-structured project.
+(scoreboard, functional-units, register, memory, top)
+
 ###2. Key Components and Their Roles
 ###Data Structures
 *	**Instruction record:** A simple representation of an instruction

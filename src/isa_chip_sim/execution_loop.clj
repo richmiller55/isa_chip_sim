@@ -75,7 +75,8 @@
                   result (fu/execute unit instruction operand-values)
                   write-reg (get-in instruction [:metadata :write-reg])
                   original-pc (get-in instruction [:metadata :original-pc])
-                  current-pc (reg/read-reg (:registers state) :pc)]
+                  pc-reg (:pc-reg state)
+                  current-pc (reg/read-reg (:registers state) pc-reg)]
               (if (= unit-keyword :branch)
                 (let [branch-taken? (:branch-taken? result)
                       target-address (:target-address result)
@@ -88,7 +89,7 @@
                     (-> state
                         (flush-pipeline-from :if-id-latch) 
                         (flush-pipeline-from :id-ex-latch) 
-                        (update :registers #(reg/write-reg % :pc actual-next-pc))
+                        (update :registers #(reg/write-reg % pc-reg actual-next-pc))
                         (assoc-in [:ex-mem-latch :data] nil)
                         (assoc :btb-prediction-taken false))
 
@@ -96,7 +97,7 @@
                     (-> state
                         (assoc-in [:if-id-latch :data] nil)
                         (assoc-in [:id-ex-latch :data] nil)
-                        (update :registers #(reg/write-reg % :pc target-address))
+                        (update :registers #(reg/write-reg % pc-reg target-address))
                         (assoc-in [:ex-mem-latch :data] nil)
                         (assoc :branch-just-taken true)
                         (update :btb assoc original-pc target-address))
@@ -121,7 +122,8 @@
 
 (defn- fetch [state]
   (if-not (:pipeline-stall state)
-    (let [pc (reg/read-reg (:registers state) :pc)
+    (let [pc-reg (:pc-reg state)
+          pc (reg/read-reg (:registers state) pc-reg)
           btb-entry (get (:btb state) pc)
           predicted-pc (if btb-entry btb-entry pc)
           instruction (get (:program state) predicted-pc)]
@@ -130,7 +132,7 @@
           (assoc-in state [:if-id-latch :data] (assoc instruction :metadata (assoc (:metadata instruction) :original-pc pc)))
           (-> state
               (assoc-in [:if-id-latch :data] (assoc instruction :metadata (assoc (:metadata instruction) :original-pc pc)))
-              (update-in [:registers :registers :pc] (fn [p] (if p (inc p) 1)))
+              (update-in [:registers :registers pc-reg] (fn [p] (if p (inc p) 1)))
               (assoc :btb-prediction-taken (boolean btb-entry))))
         (assoc-in state [:if-id-latch :data] nil)))
     state))
